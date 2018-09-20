@@ -1947,7 +1947,8 @@ Error HWC2On1Adapter::Layer::setCursorPosition(int32_t x, int32_t y) {
 
     auto displayId = mDisplay.getHwc1Id();
     auto hwc1Device = mDisplay.getDevice().getHwc1Device();
-    hwc1Device->setCursorPositionAsync(hwc1Device, displayId, x, y);
+    if(hwc1Device != NULL && hwc1Device->setCursorPositionAsync)
+        hwc1Device->setCursorPositionAsync(hwc1Device, displayId, x, y);
     return Error::None;
 }
 
