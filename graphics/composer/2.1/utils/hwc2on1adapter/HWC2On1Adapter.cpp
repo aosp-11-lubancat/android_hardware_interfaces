@@ -1917,6 +1917,7 @@ HWC2On1Adapter::Layer::Layer(Display& display)
     mSourceCrop({0.0f, 0.0f, -1.0f, -1.0f}),
     mTransform(Transform::None),
     mVisibleRegion(),
+    mDataSpace(HAL_DATASPACE_UNKNOWN),
     mZ(0),
     mReleaseFence(),
     mHwc1Id(0),
@@ -1980,7 +1981,9 @@ Error HWC2On1Adapter::Layer::setCompositionType(Composition type) {
     return Error::None;
 }
 
-Error HWC2On1Adapter::Layer::setDataspace(android_dataspace_t) {
+Error HWC2On1Adapter::Layer::setDataspace(android_dataspace_t dataspace) {
+    mDataSpace = dataspace;
+    mDisplay.markGeometryChanged();
     return Error::None;
 }
 
@@ -2104,6 +2107,7 @@ std::string HWC2On1Adapter::Layer::dump() const {
                 frectString(mSourceCrop) << '\n';
         output << fill << "  Transform: " << to_string(mTransform);
         output << "  Blend mode: " << to_string(mBlendMode);
+        output << " DataSpace: " << mDataSpace;
         if (mPlaneAlpha != 1.0f) {
             output << "  Alpha: " <<
                 alphaString(mPlaneAlpha) << '\n';
@@ -2149,6 +2153,11 @@ void HWC2On1Adapter::Layer::applyCommonState(hwc_layer_1_t& hwc1Layer) {
     } else {
         hwc1Layer.sourceCropf = mSourceCrop;
     }
+    auto pendingDataSpace = mDataSpace;
+    hwc1Layer.reserved[0] = pendingDataSpace & 0xFF;
+    hwc1Layer.reserved[1] = (pendingDataSpace >> 8) & 0xFF;
+    hwc1Layer.reserved[2] = (pendingDataSpace >> 16) & 0xFF;
+    hwc1Layer.reserved[3] = (pendingDataSpace >> 24) & 0xFF;
 
     hwc1Layer.transform = static_cast<uint32_t>(mTransform);
 
