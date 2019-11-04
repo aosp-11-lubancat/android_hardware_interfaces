@@ -850,6 +850,8 @@ Error HWC2On1Adapter::Display::setColorMode(android_color_mode_t mode) {
     std::unique_lock<std::recursive_mutex> lock (mStateMutex);
 
     ALOGV("[%" PRIu64 "] setColorMode(%d)", mId, mode);
+    if (mode == -1)
+        return Error::BadParameter;
 
     if(mode){
         return Error::None;
@@ -908,6 +910,8 @@ static bool isValid(PowerMode mode) {
         case PowerMode::DozeSuspend: // Fall-through
         case PowerMode::Doze: // Fall-through
         case PowerMode::On: return true;
+        default:
+            return false;
     }
 }
 
