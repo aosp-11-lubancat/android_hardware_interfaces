@@ -851,6 +851,10 @@ Error HWC2On1Adapter::Display::setColorMode(android_color_mode_t mode) {
 
     ALOGV("[%" PRIu64 "] setColorMode(%d)", mId, mode);
 
+    if(mode){
+        return Error::None;
+    }
+
     if (mode == mActiveColorMode) {
         return Error::None;
     }
