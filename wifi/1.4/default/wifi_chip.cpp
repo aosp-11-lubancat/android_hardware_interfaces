@@ -45,6 +45,9 @@ constexpr char kActiveWlanIfaceNameProperty[] = "wifi.active.interface";
 constexpr char kNoActiveWlanIfaceNamePropertyValue[] = "";
 constexpr unsigned kMaxWlanIfaces = 5;
 
+extern "C" int check_wifi_chip_type_string(char *type);
+static char wifi_type[64] = {0};
+
 template <typename Iface>
 void invalidateAndClear(std::vector<sp<Iface>>& ifaces, sp<Iface> iface) {
     iface->invalidate();
@@ -113,7 +116,16 @@ std::string getApIfaceName() {
 
 std::string getP2pIfaceName() {
     std::array<char, PROPERTY_VALUE_MAX> buffer;
-    property_get("wifi.direct.interface", buffer.data(), "p2p0");
+	    if (wifi_type[0] == 0) {
+	    check_wifi_chip_type_string(wifi_type);
+    }
+    if (0 == strncmp(wifi_type, "AP", 2)) {
+		property_set("vendor.wifi.direct.interface", "p2p-dev-wlan0");
+		property_get("wifi.direct.interface", buffer.data(), "p2p-dev-wlan0");
+    } else {
+		property_set("vendor.wifi.direct.interface", "p2p0");
+		property_get("wifi.direct.interface", buffer.data(), "p2p0");
+	}
     return buffer.data();
 }
 

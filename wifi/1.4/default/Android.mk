@@ -66,6 +66,7 @@ LOCAL_SHARED_LIBRARIES := \
     libnl \
     libutils \
     libwifi-hal \
+    librkwifi-ctrl \
     libwifi-system-iface \
     android.hardware.wifi@1.0 \
     android.hardware.wifi@1.1 \
@@ -94,6 +95,7 @@ LOCAL_SHARED_LIBRARIES := \
     libnl \
     libutils \
     libwifi-hal \
+    librkwifi-ctrl \
     libwifi-system-iface \
     android.hardware.wifi@1.0 \
     android.hardware.wifi@1.1 \
@@ -126,6 +128,7 @@ LOCAL_SHARED_LIBRARIES := \
     libnl \
     libutils \
     libwifi-hal \
+    librkwifi-ctrl \
     libwifi-system-iface \
     android.hardware.wifi@1.0 \
     android.hardware.wifi@1.1 \
@@ -173,5 +176,6 @@ LOCAL_SHARED_LIBRARIES := \
     libnl \
     libutils \
     libwifi-hal \
+    librkwifi-ctrl \
     libwifi-system-iface
 include $(BUILD_NATIVE_TEST)
