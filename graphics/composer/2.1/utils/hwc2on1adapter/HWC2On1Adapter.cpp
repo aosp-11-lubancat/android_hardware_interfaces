@@ -2616,6 +2616,20 @@ void HWC2On1Adapter::hwc1Hotplug(int hwc1DisplayId, int connected) {
         displayId = mHwc1DisplayMap[hwc1DisplayId];
         mHwc1DisplayMap.erase(HWC_DISPLAY_EXTERNAL);
         mDisplays.erase(displayId);
+        //Remove extern display context if plug out HDMI.
+        //Fix crash when plug out HDMI.
+        /*
+          F DEBUG   : signal 11 (SIGSEGV), code 1 (SEGV_MAPERR), fault addr 0x10
+          ...
+          F DEBUG   :     #00 pc 0000000000068790  /system/lib64/libc.so (pthread_mutex_lock)
+          F DEBUG   :     #01 pc 00000000000b8a7c  /system/lib64/vndk-sp/libc++.so (std::__1::recursive_mutex::lock()+8)
+          F DEBUG   :     #02 pc 00000000000116f4  /vendor/lib64/libhwc2on1adapter.so (android::HWC2On1Adapter::setAllDisplays()+740)
+          F DEBUG   :     #03 pc 00000000000112b8  /vendor/lib64/libhwc2on1adapter.so (android::HWC2On1Adapter::Display::present(int*)+72)
+        */
+        if (mHwc1Contents[HWC_DISPLAY_EXTERNAL] != nullptr)
+        {
+           mHwc1Contents.erase(mHwc1Contents.begin()+HWC_DISPLAY_EXTERNAL);
+        }
     }
 
     // If the HWC2-side callback hasn't been registered yet, buffer this until
