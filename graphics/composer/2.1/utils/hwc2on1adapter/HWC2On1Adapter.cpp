@@ -2580,6 +2580,27 @@ void HWC2On1Adapter::hwc1Vsync(int hwc1DisplayId, int64_t timestamp) {
     vsync(callbackInfo.data, displayId, timestamp);
 }
 
+Error HWC2On1Adapter::Display::destroyLayers() {
+    std::unique_lock<std::recursive_mutex> lock(mStateMutex);
+
+    for (auto current = mLayers.begin(); current != mLayers.end(); ++current) {
+        for(auto current2 = mDevice.mLayers.begin(); current2 != mDevice.mLayers.end(); )
+        {
+          if(**current == *(current2->second))
+          {
+            current2=mDevice.mLayers.erase(current2);
+          }
+          else
+            ++current2;
+        }
+    }
+
+    mLayers.clear();
+    markGeometryChanged();
+
+    return Error::None;
+}
+
 void HWC2On1Adapter::hwc1Hotplug(int hwc1DisplayId, int connected) {
     ALOGV("Received hwc1Hotplug(%d, %d)", hwc1DisplayId, connected);
 
@@ -2612,8 +2633,10 @@ void HWC2On1Adapter::hwc1Hotplug(int hwc1DisplayId, int connected) {
             return;
         }
 
-        // Disconnect an existing display
         displayId = mHwc1DisplayMap[hwc1DisplayId];
+        auto& display = mDisplays[displayId];
+        display->destroyLayers();
+        // Disconnect an existing display
         mHwc1DisplayMap.erase(HWC_DISPLAY_EXTERNAL);
         mDisplays.erase(displayId);
         //Remove extern display context if plug out HDMI.
