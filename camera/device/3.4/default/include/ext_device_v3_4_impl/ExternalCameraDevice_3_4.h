@@ -23,7 +23,7 @@
 #include <android/hardware/camera/device/3.2/ICameraDevice.h>
 #include <hidl/Status.h>
 #include <hidl/MQDescriptor.h>
-#include "ExternalCameraDeviceSession.h"
+#include "ExternalCameraDeviceSession_3.4.h"
 
 #include <vector>
 

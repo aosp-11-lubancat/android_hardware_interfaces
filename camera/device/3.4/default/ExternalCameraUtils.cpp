@@ -27,7 +27,7 @@
 
 #include <jpeglib.h>
 
-#include "ExternalCameraUtils.h"
+#include "ExternalCameraUtils_3.4.h"
 
 namespace {
 

@@ -24,7 +24,7 @@
 #include <utils/Thread.h>
 #include <hidl/Status.h>
 #include <hidl/MQDescriptor.h>
-#include "ExternalCameraUtils.h"
+#include "ExternalCameraUtils_3.4.h"
 
 #include "CameraProvider_2_4.h"
 

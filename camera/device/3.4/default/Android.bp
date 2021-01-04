@@ -82,6 +82,17 @@ cc_library_shared {
         "ExternalCameraDevice.cpp",
         "ExternalCameraDeviceSession.cpp",
         "ExternalCameraUtils.cpp",
+        "RgaCropScale.cpp",
+        "ExternalCameraMemManager.cpp",
+        "ExternalCameraGralloc.cpp"
+    ],
+    include_dirs: [
+        "hardware/rockchip/libhwjpeg/inc",
+        "hardware/rockchip/libhwjpeg/inc/mpp_inc",
+        "hardware/rockchip/librga"
+    ],
+    header_libs: [
+        "gl_headers",
     ],
     shared_libs: [
         "libhidlbase",
@@ -106,12 +117,21 @@ cc_library_shared {
         "libjpeg",
         "libexif",
         "libtinyxml2",
+        "libui",
+        "librga",
+        "libhwjpeg"
     ],
     static_libs: [
         "android.hardware.camera.common@1.0-helper",
     ],
+    cppflags: [
+        "-Wno-error",
+        "-Wno-unused",
+        "-DRK_HW_JPEG_DECODER"
+    ],
     local_include_dirs: ["include/ext_device_v3_4_impl"],
     export_shared_lib_headers: [
         "libfmq",
+        "libhwjpeg"
     ],
 }
