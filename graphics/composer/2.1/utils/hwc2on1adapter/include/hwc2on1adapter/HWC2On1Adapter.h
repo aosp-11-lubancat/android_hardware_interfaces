@@ -279,6 +279,10 @@ private:
 
             void markGeometryChanged() { mGeometryChanged = true; }
             void resetGeometryMarker() { mGeometryChanged = false;}
+            void markHasPrepare() { mHasPrepare = true; }
+            void resetHasPrepare() { mHasPrepare = false;}
+            void markHasSet() { mHasSet = true; }
+            void resetHasSet() { mHasSet = false;}
         private:
             class Config {
                 public:
@@ -459,6 +463,8 @@ private:
             // updated with anything other than a buffer since last call to
             // Display::set()
             bool mGeometryChanged;
+            bool mHasPrepare;
+            bool mHasSet;
     };
 
     // Utility template calling a Display object method directly based on the

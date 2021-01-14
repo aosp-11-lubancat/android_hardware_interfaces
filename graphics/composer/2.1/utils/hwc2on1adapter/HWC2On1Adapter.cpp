@@ -528,7 +528,9 @@ HWC2On1Adapter::Display::Display(HWC2On1Adapter& device, HWC2::DisplayType type)
     mHwc1LayerMap(),
     mNumAvailableRects(0),
     mNextAvailableRect(nullptr),
-    mGeometryChanged(false)
+    mGeometryChanged(false),
+    mHasPrepare(false),
+    mHasSet(false)
     {}
 
 Error HWC2On1Adapter::Display::acceptChanges() {
@@ -786,8 +788,7 @@ Error HWC2On1Adapter::Display::getType(int32_t* outType) {
 
 Error HWC2On1Adapter::Display::present(int32_t* outRetireFence) {
     std::unique_lock<std::recursive_mutex> lock(mStateMutex);
-
-    if (mChanges) {
+    if (mChanges && !mHasSet) {
         Error error = mDevice.setAllDisplays();
         if (error != Error::None) {
             ALOGE("[%" PRIu64 "] present: setAllDisplaysFailed (%s)", mId,
@@ -963,7 +964,6 @@ Error HWC2On1Adapter::Display::setVsyncEnabled(Vsync enable) {
             mHwc1Id, HWC_EVENT_VSYNC, enable == Vsync::Enable);
     ALOGE_IF(error != 0, "setVsyncEnabled: Failed to set vsync on HWC1 (%d)",
             error);
-
     mVsyncEnabled = enable;
     return Error::None;
 }
@@ -972,11 +972,11 @@ Error HWC2On1Adapter::Display::validate(uint32_t* outNumTypes,
         uint32_t* outNumRequests) {
     std::unique_lock<std::recursive_mutex> lock(mStateMutex);
 
-    if (!mChanges) {
+    if (!mChanges && !mHasPrepare) {
         if (!mDevice.prepareAllDisplays()) {
             return Error::BadDisplay;
         }
-    } else {
+    } else if(!mHasPrepare){
         ALOGE("Validate was called more than once!");
     }
 
@@ -1274,6 +1274,7 @@ Error HWC2On1Adapter::Display::set(hwc_display_contents_1& hwcContents) {
 
     if (!mChanges || (mChanges->getNumTypes() > 0)) {
         ALOGE("[%" PRIu64 "] set failed: not validated", mId);
+
         return Error::NotValidated;
     }
 
@@ -2397,6 +2398,8 @@ bool HWC2On1Adapter::prepareAllDisplays() {
         auto displayId = mHwc1DisplayMap[hwc1Id];
         auto& display = mDisplays[displayId];
         display->generateChanges();
+        display->markHasPrepare();
+        display->resetHasSet();
     }
 
     return true;
@@ -2521,6 +2524,8 @@ Error HWC2On1Adapter::setAllDisplays() {
                 retireFenceFd, hwc1Id);
         display->addRetireFence(mHwc1Contents[hwc1Id]->retireFenceFd);
         display->addReleaseFences(*mHwc1Contents[hwc1Id]);
+        display->resetHasPrepare();
+        display->markHasSet();
     }
 
     return Error::None;
