@@ -46,30 +46,6 @@ typedef enum buffer_addr_e {
     buffer_sharre_fd
 }buffer_addr_t;
 
-typedef unsigned long ulong_t;
-/* mjpeg decoder interface in librk_vpu_api.*/
-typedef void* (*getMjpegDecoderFun)(void);
-typedef void (*destroyMjpegDecoderFun)(void* jpegDecoder);
-
-typedef int (*initMjpegDecoderFun)(void* jpegDecoder);
-typedef int (*deInitMjpegDecoderFun)(void* jpegDecoder);
-
-typedef int (*mjpegDecodeOneFrameFun)(
-            void * jpegDecoder, uint8_t* aOutBuffer,
-            uint32_t *aOutputLength, uint8_t* aInputBuf,
-            uint32_t* aInBufSize, ulong_t out_phyaddr);
-
-typedef struct mjpeg_interface {
-    void*                       decoder;
-    int                         state;
-
-    getMjpegDecoderFun          get;
-    destroyMjpegDecoderFun      destroy;
-    initMjpegDecoderFun         init;
-    deInitMjpegDecoderFun       deInit;
-    mjpegDecodeOneFrameFun      decode;
-} mjpeg_interface_t;
-
 class MemManagerBase : public virtual VirtualLightRefBase {
 public :
     MemManagerBase();
