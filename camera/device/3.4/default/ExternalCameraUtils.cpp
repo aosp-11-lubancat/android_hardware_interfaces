@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 #define LOG_TAG "ExtCamUtils@3.4"
-//#define LOG_NDEBUG 0
+#define LOG_NDEBUG 0
 #include <log/log.h>
 
 #include <cmath>

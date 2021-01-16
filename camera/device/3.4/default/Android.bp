@@ -84,15 +84,20 @@ cc_library_shared {
         "ExternalCameraUtils.cpp",
         "RgaCropScale.cpp",
         "ExternalCameraMemManager.cpp",
-        "ExternalCameraGralloc.cpp"
+        "ExternalCameraGralloc4.cpp"
     ],
     include_dirs: [
         "hardware/rockchip/libhwjpeg/inc",
         "hardware/rockchip/libhwjpeg/inc/mpp_inc",
-        "hardware/rockchip/librga"
+        "hardware/rockchip/librga",
+        "external/libdrm/include/drm",
     ],
     header_libs: [
         "gl_headers",
+        "libbase_headers",
+        "libnativebase_headers",
+        "libhardware_headers",
+        "libui_headers",
     ],
     shared_libs: [
         "libhidlbase",
@@ -104,9 +109,6 @@ cc_library_shared {
         "android.hardware.camera.device@3.3",
         "android.hardware.camera.device@3.4",
         "android.hardware.camera.provider@2.4",
-        "android.hardware.graphics.mapper@2.0",
-        "android.hardware.graphics.mapper@3.0",
-        "android.hardware.graphics.mapper@4.0",
         "liblog",
         "libgralloctypes",
         "libhardware",
@@ -119,19 +121,46 @@ cc_library_shared {
         "libtinyxml2",
         "libui",
         "librga",
-        "libhwjpeg"
+        "libhwjpeg",
+        "libbase",
+        "android.hardware.graphics.allocator@2.0",
+        "android.hardware.graphics.allocator@3.0",
+        "android.hardware.graphics.allocator@4.0",
+        "android.hardware.graphics.common@1.2",
+        "android.hardware.graphics.mapper@2.0",
+        "android.hardware.graphics.mapper@2.1",
+        "android.hardware.graphics.mapper@3.0",
+        "android.hardware.graphics.mapper@4.0",
     ],
     static_libs: [
         "android.hardware.camera.common@1.0-helper",
+        "libgrallocusage",
     ],
+    // bufferhub is not used when building libgui for vendors
+    target: {
+        vendor: {
+            cflags: ["-DLIBUI_IN_VNDK"],
+            exclude_srcs: [
+            ],
+            exclude_header_libs: [
+            ],
+            exclude_shared_libs: [
+            ],
+        },
+    },
     cppflags: [
         "-Wno-error",
         "-Wno-unused",
-        "-DRK_HW_JPEG_DECODER"
+        "-DRK_HW_JPEG_DECODER",
+        "-DRK_GRALLOC_4",
     ],
     local_include_dirs: ["include/ext_device_v3_4_impl"],
     export_shared_lib_headers: [
         "libfmq",
-        "libhwjpeg"
+        "libhwjpeg",
+        "android.hardware.graphics.common@1.2",
+        "android.hardware.graphics.mapper@4.0",
+        "libgralloctypes",
     ],
+	min_sdk_version: "29",
 }

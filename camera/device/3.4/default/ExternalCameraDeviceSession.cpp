@@ -14,11 +14,12 @@
  * limitations under the License.
  */
 #define LOG_TAG "ExtCamDevSsn@3.4"
-//#define LOG_NDEBUG 0
+#define LOG_NDEBUG 0
 #define ATRACE_TAG ATRACE_TAG_CAMERA
 #include <log/log.h>
 
 #include <inttypes.h>
+
 #include "ExternalCameraDeviceSession_3.4.h"
 
 #include "android-base/macros.h"
@@ -32,8 +33,11 @@
 
 #include <jpeglib.h>
 #include "RgaCropScale.h"
+#include "ExternalCameraGralloc4.h"
 
-#include "ExternalCameraGralloc.h"
+#define RK_GRALLOC_USAGE_SPECIFY_STRIDE 1ULL << 30
+
+//#define DUMP_YUV
 
 namespace android {
 namespace hardware {
@@ -119,6 +123,8 @@ void ExternalCameraDeviceSession::createPreviewBuffer() {
     LOGD("alloc buffer W:H=%dx%d", tempWidth, tempHeight);
     mGrallocBuf.mPerBuffersize = PAGE_ALIGN(tempWidth * tempHeight * 2);
     mGrallocBuf.mBufType = PREVIEWBUFFER;
+    mGrallocBuf.width = tempWidth;
+    mGrallocBuf.height = tempHeight;
     mFormatConvertThread->mCamMemManager = new GrallocDrmMemManager(false);
     if(mFormatConvertThread->mCamMemManager->createPreviewBuffer(&mGrallocBuf)) {
         LOGE("alloc graphic buffer failed !");
@@ -1100,16 +1106,44 @@ bool ExternalCameraDeviceSession::FormatConvertThread::threadLoop() {
             PREVIEWBUFFER, req->frameIn->mBufferIndex, buffer_sharre_fd);
     mVirAddr = mCamMemManager->getBufferAddr(
             PREVIEWBUFFER, req->frameIn->mBufferIndex, buffer_addr_vir);
+
+    LOGD("%s(%d)mShareFd(%d) mVirAddr(%p)!\n", __FUNCTION__, __LINE__, mShareFd, mVirAddr);
+
     int tmpW = req->frameIn->mWidth;
     int tmpH = req->frameIn->mHeight;
     if (req->frameIn->mFourcc == V4L2_PIX_FMT_MJPEG) {
+#ifdef RK_HW_JPEG_DECODER
         int ret = jpegDecoder(mShareFd, inData, inDataSize);
         if(!ret) {
             LOGE("mjpeg decode failed");
             mFmtOutputThread->submitRequest(req);
             return true;
         }
+#ifdef DUMP_YUV
+        {
+            int frameCount = req->frameNumber;
+            if(frameCount > 5 && frameCount<10){
+                FILE* fp =NULL;
+                char filename[128];
+                filename[0] = 0x00;
+                sprintf(filename, "/data/camera/camera_dump_hwjpeg_%dx%d_%d.yuv",
+                        tmpW, tmpH, frameCount);
+                fp = fopen(filename, "wb+");
+                if (fp != NULL) {
+                    fwrite((char*)mVirAddr,1,tmpW*tmpH*1.5,fp);
+                    fclose(fp);
+                    ALOGI("Write success YUV data to %s",filename);
+                } else {
+                    ALOGE("Create %s failed(%d, %s)",filename,fp, strerror(errno));
+                }
+            }
+        }
+#endif
+
+#endif
         req->mShareFd = mShareFd;
+        req->mVirAddr = mVirAddr;
+
     } else if (req->frameIn->mFourcc == V4L2_PIX_FMT_YUYV) {
         //yuyvToNv12(V4L2_PIX_FMT_NV12, (char*)inData,
         //        (char*)mVirAddr, tmpW, tmpH, tmpW, tmpH);
@@ -1725,7 +1759,7 @@ bool ExternalCameraDeviceSession::OutputThread::threadLoop() {
     }
 
     if (isBlobOrYv12 && req->frameIn->mFourcc == V4L2_PIX_FMT_MJPEG) {
-            LOGD("format is BLOB or YV12,use software jpeg decoder");
+        LOGD("format is BLOB or YV12,use software jpeg decoder, framenumber(%d)", req->frameNumber);
         ATRACE_BEGIN("MJPGtoI420");
         int res = libyuv::MJPGToI420(
             req->inData, req->inDataSize, static_cast<uint8_t*>(mYu12FrameLayout.y), mYu12FrameLayout.yStride,
@@ -1760,7 +1794,7 @@ bool ExternalCameraDeviceSession::OutputThread::threadLoop() {
         YCbCrLayout input;
         input.y = (uint8_t*)req->inData;
         input.yStride = mYu12Frame->mWidth;
-        input.cb = (uint8_t*)(req->mShareFd) + tempFrameWidth * tempFrameHeight;
+        input.cb = (uint8_t*)(req->inData) + tempFrameWidth * tempFrameHeight;
         input.cStride = mYu12Frame->mWidth;
         LOGD("format is BLOB or YV12, use software YUYVtoI420");
 
@@ -1930,26 +1964,115 @@ bool ExternalCameraDeviceSession::OutputThread::threadLoop() {
                         signalRequestDone();
                         return true;
                     }
+#ifndef RK_HW_JPEG_DECODER
+                     int res = libyuv::MJPGToI420(
+                         req->inData, req->inDataSize, static_cast<uint8_t*>(mYu12FrameLayout.y), mYu12FrameLayout.yStride,
+                         static_cast<uint8_t*>(mYu12FrameLayout.cb), mYu12FrameLayout.cStride,
+                         static_cast<uint8_t*>(mYu12FrameLayout.cr), mYu12FrameLayout.cStride,
+                         mYu12Frame->mWidth, mYu12Frame->mHeight, mYu12Frame->mWidth, mYu12Frame->mHeight);
+                     ALOGV("%s MJPGToI420 end, I420ToNV12 start", __FUNCTION__);
+                     ATRACE_BEGIN("I420ToNV12");
+                     YCbCrLayout output;
+                     output.y = (uint8_t*)req->mVirAddr;
+                     output.yStride = mYu12Frame->mWidth;
+                     output.cb = (uint8_t*)(req->mVirAddr) + tempFrameWidth * tempFrameHeight;
+                     output.cStride = mYu12Frame->mWidth;
+
+                     res = libyuv::I420ToNV12(
+                             static_cast<uint8_t*>(mYu12FrameLayout.y),
+                             mYu12FrameLayout.yStride,
+                             static_cast<uint8_t*>(mYu12FrameLayout.cb),
+                             mYu12FrameLayout.cStride,
+                             static_cast<uint8_t*>(mYu12FrameLayout.cr),
+                             mYu12FrameLayout.cStride,
+                             static_cast<uint8_t*>(output.y),
+                             output.yStride,
+                             static_cast<uint8_t*>(output.cb),
+                             output.cStride,
+                             mYu12Frame->mWidth, mYu12Frame->mHeight);
+                    ATRACE_END();
+#ifdef DUMP_YUV
+                    {
+                        static int frameCount = req->frameNumber;
+                        if(++frameCount > 5 && frameCount<10){
+                            FILE* fp =NULL;
+                            char filename[128];
+                            filename[0] = 0x00;
+                            sprintf(filename, "/data/camera/camera_dump_%dx%d_%d.yuv",
+                                    tempFrameWidth, tempFrameHeight, frameCount);
+                            fp = fopen(filename, "wb+");
+                            if (fp != NULL) {
+                                fwrite((char*)req->mVirAddr, 1, tempFrameWidth*tempFrameHeight*1.5, fp);
+                                fclose(fp);
+                                ALOGI("Write success YUV data to %s",filename);
+                            } else {
+                                ALOGE("Create %s failed(%d, %s)",filename,fp, strerror(errno));
+                            }
+                        }
+                    }
+#endif
+#endif
+
                     int handle_fd = -1, ret;
-                    gralloc_module_t const* mGrallocModule;
-                    const hw_module_t *allocMod = NULL;
-                    const native_handle_t* tmp_hand = (const native_handle_t*)*(halBuf.bufPtr);
-                    ret= hw_get_module(GRALLOC_HARDWARE_MODULE_ID, &allocMod);
-                    mGrallocModule = reinterpret_cast<gralloc_module_t const *>(allocMod);
-                    mGrallocModule->perform(
-                            mGrallocModule,
-                            GRALLOC_MODULE_PERFORM_GET_HADNLE_PRIME_FD,
-                            tmp_hand,
-                            &handle_fd);
+                    const native_handle_t* tmp_hand = (const native_handle_t*)(*(halBuf.bufPtr));
+                    ret = ExCamGralloc4::get_share_fd(tmp_hand, &handle_fd);
                     if (handle_fd == -1) {
                         LOGE("convert tmp_hand to dst_fd error");
                         return -EINVAL;
                     }
+                    ALOGV("%s(%d): halBuf handle_fd(%d)", __FUNCTION__, __LINE__, handle_fd);
+                    ALOGV("%s(%d) halbuf_wxh(%dx%d) frameNumber(%d)", __FUNCTION__, __LINE__,
+                        halBuf.width, halBuf.height, req->frameNumber);
+
                     camera2::RgaCropScale::rga_nv12_scale_crop(
                         tempFrameWidth, tempFrameHeight, req->mShareFd, handle_fd,
                         halBuf.width, halBuf.height, 100, false, true,
                         (halBuf.format == PixelFormat::YCRCB_420_SP), is16Align,
                         req->frameIn->mFourcc == V4L2_PIX_FMT_YUYV);
+#ifdef DUMP_YUV
+                    {
+                        void* mVirAddr = NULL;
+                        ret = ExCamGralloc4::lock(
+                                    tmp_hand,
+                                    halBuf.usage,
+                                    0,
+                                    0,
+                                    halBuf.width,
+                                    halBuf.height,
+                                    (void**)&mVirAddr);
+                        if (ret) {
+                            LOGE("lock buffer error : %s", strerror(errno));
+                        }
+                        ExCamGralloc4::unlock(tmp_hand);
+                        int frameCount = req->frameNumber;
+                        if( frameCount > 4 && frameCount<10){
+                            FILE* fp =NULL;
+                            char filename[128];
+                            filename[0] = 0x00;
+                            sprintf(filename, "/data/camera/camera_dump_%dx%d_%d.yuv",
+                                    tempFrameWidth, tempFrameHeight, frameCount);
+                            fp = fopen(filename, "wb+");
+                            if (fp != NULL) {
+                                fwrite((char*)req->mVirAddr, 1, tempFrameWidth*tempFrameHeight*1.5, fp);
+                                fclose(fp);
+                                ALOGI("Write success YUV data to %s",filename);
+                            } else {
+                                ALOGE("Create %s failed(%d, %s)",filename,fp, strerror(errno));
+                            }
+                            sprintf(filename, "/data/camera/camera_dump_halbuf_%dx%d_%d.yuv",
+                                    halBuf.width, halBuf.height, frameCount);
+                            fp = fopen(filename, "wb+");
+                            if (fp != NULL) {
+                                fwrite((char*)mVirAddr, 1, tempFrameWidth*tempFrameHeight*1.5, fp);
+                                fclose(fp);
+                                ALOGI("Write success YUV data to %s",filename);
+                            } else {
+                                ALOGE("Create %s failed(%d, %s)",filename,fp, strerror(errno));
+                            }
+                        }
+                    }
+#endif
+
                 }
             } break;
             default:
@@ -2321,6 +2444,7 @@ int ExternalCameraDeviceSession::setV4l2FpsLocked(double fps) {
 
     double retFps = streamparm.parm.capture.timeperframe.denominator /
             static_cast<double>(streamparm.parm.capture.timeperframe.numerator);
+    ALOGV("%s: retFps(%f)", __FUNCTION__, retFps);
     if (std::fabs(fps - retFps) > 1.0) {
         ALOGE("%s: expect fps %f, got %f instead", __FUNCTION__, fps, retFps);
         return -1;
@@ -2330,7 +2454,7 @@ int ExternalCameraDeviceSession::setV4l2FpsLocked(double fps) {
 }
 
 int ExternalCameraDeviceSession::configureV4l2StreamLocked(
-        const SupportedV4L2Format& v4l2Fmt, double requestFps) {
+        SupportedV4L2Format& v4l2Fmt, double requestFps) {
     ATRACE_CALL();
     ALOGD("V4L configuration format:%c%c%c%c, w %d, h %d",
         v4l2Fmt.fourcc & 0xFF,
@@ -2381,8 +2505,11 @@ int ExternalCameraDeviceSession::configureV4l2StreamLocked(
                 (fmt.fmt.pix.pixelformat >> 16) & 0xFF,
                 (fmt.fmt.pix.pixelformat >> 24) & 0xFF,
                 fmt.fmt.pix.width, fmt.fmt.pix.height);
-        return -EINVAL;
+        //return -EINVAL;
+        v4l2Fmt.width = fmt.fmt.pix.width;
+        v4l2Fmt.height = fmt.fmt.pix.height;
     }
+
     uint32_t bufferSize = fmt.fmt.pix.sizeimage;
     ALOGI("%s: V4L2 buffer size is %d", __FUNCTION__, bufferSize);
     uint32_t expectedMaxBufferSize = kMaxBytesPerPixel * fmt.fmt.pix.width * fmt.fmt.pix.height;
@@ -2788,7 +2915,7 @@ Status ExternalCameraDeviceSession::configureStreams(
         mStreamMap[config.streams[i].id].usage =
                 out->streams[i].v3_2.producerUsage = config.streams[i].usage |
                 BufferUsage::CPU_WRITE_OFTEN |
-                BufferUsage::CAMERA_OUTPUT;
+                BufferUsage::CAMERA_OUTPUT | RK_GRALLOC_USAGE_SPECIFY_STRIDE;
         out->streams[i].v3_2.consumerUsage = 0;
         out->streams[i].v3_2.maxBuffers  = mV4L2BufferCount;
 
@@ -2797,10 +2924,10 @@ Status ExternalCameraDeviceSession::configureStreams(
             case PixelFormat::YCBCR_420_888:
             case PixelFormat::YV12: // Used by SurfaceTexture
             case PixelFormat::Y16:
+             case PixelFormat::YCRCB_420_SP:
                 // No override
                 out->streams[i].v3_2.overrideFormat = config.streams[i].format;
                 break;
-			case PixelFormat::YCRCB_420_SP:
             case PixelFormat::IMPLEMENTATION_DEFINED:
 			
                 // Override based on VIDEO or not

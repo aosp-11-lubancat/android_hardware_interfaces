@@ -17,9 +17,9 @@
 #ifndef ANDROID_HARDWARE_CAMERA_MEM_MANAGER
 #define ANDROID_HARDWARE_CAMERA_MEM_MANAGER
 
-#include "ExternalCameraGralloc.h"
 #include <dlfcn.h>
 #include "utils/LightRefBase.h"
+#include "ExternalCameraGralloc4.h"
 
 namespace android {
 
@@ -38,6 +38,8 @@ struct bufferinfo_s{
     unsigned long mVirBaseAddr;
     unsigned long mShareFd;
     buffer_type_enum mBufType;
+    uint32_t width;
+    uint32_t height;
 };
 
 typedef enum buffer_addr_e {

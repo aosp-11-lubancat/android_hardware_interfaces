@@ -15,6 +15,8 @@
  */
 
 #define LOG_TAG "CamGraBuf"
+#define LOG_NDEBUG 0
+#include <log/log.h>
 #include <utils/threads.h>
 #include <utils/Log.h>
 #include <ui/GraphicBufferAllocator.h>

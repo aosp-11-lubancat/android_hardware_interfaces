@@ -295,7 +295,7 @@ protected:
             uint32_t blobBufferSize = 0);
     // fps = 0.0 means default, which is
     // slowest fps that is at least 30, or fastest fps if 30 is not supported
-    int configureV4l2StreamLocked(const SupportedV4L2Format& fmt, double fps = 0.0);
+    int configureV4l2StreamLocked(SupportedV4L2Format& fmt, double fps = 0.0);
     int v4l2StreamOffLocked();
     int setV4l2FpsLocked(double fps);
     static Status isStreamCombinationSupported(const V3_2::StreamConfiguration& config,

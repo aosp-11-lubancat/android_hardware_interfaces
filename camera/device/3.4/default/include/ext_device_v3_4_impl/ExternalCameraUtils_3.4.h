@@ -210,6 +210,7 @@ struct HalRequest {
     nsecs_t shutterTs;
     std::vector<HalStreamBuffer> buffers;
     unsigned long mShareFd;
+    unsigned long mVirAddr;
     uint8_t* inData;
     size_t inDataSize;
 };
