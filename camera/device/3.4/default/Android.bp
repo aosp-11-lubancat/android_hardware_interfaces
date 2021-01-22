@@ -160,6 +160,7 @@ cc_library_shared {
         "libhwjpeg",
         "android.hardware.graphics.common@1.2",
         "android.hardware.graphics.mapper@4.0",
+        "android.hardware.graphics.allocator@4.0",
         "libgralloctypes",
     ],
 	min_sdk_version: "29",

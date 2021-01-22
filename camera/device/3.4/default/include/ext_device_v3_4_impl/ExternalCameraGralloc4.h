@@ -113,11 +113,11 @@ struct cam_mem_ops_des_s{
  * ---------------------------------------------------------------------------------------------------------
  */
 namespace ExCamGralloc4 {
-    static int get_width(buffer_handle_t handle, uint64_t* width);
-    static int get_height(buffer_handle_t handle, uint64_t* height);
-    static status_t validateBufferDescriptorInfo(
+    int get_width(buffer_handle_t handle, uint64_t* width);
+    int get_height(buffer_handle_t handle, uint64_t* height);
+    status_t validateBufferDescriptorInfo(
         android::hardware::graphics::mapper::V4_0::IMapper::BufferDescriptorInfo* descriptorInfo);
-    static status_t createDescriptor(void* bufferDescriptorInfo,
+    status_t createDescriptor(void* bufferDescriptorInfo,
                                 void* outBufferDescriptor);
     int lock(buffer_handle_t bufferHandle,
 							  uint32_t flags,
@@ -131,9 +131,9 @@ namespace ExCamGralloc4 {
     int get_allocation_size(buffer_handle_t handle, uint64_t* allocation_size);
     int get_share_fd(buffer_handle_t handle, int* share_fd);
 
-    static status_t importBuffer(buffer_handle_t rawHandle,
+    status_t importBuffer(buffer_handle_t rawHandle,
 								  buffer_handle_t* outBufferHandle);
-    static status_t freeBuffer(buffer_handle_t bufferHandle);
+    status_t freeBuffer(buffer_handle_t bufferHandle);
 } // namespace ExCamGralloc4
 
 #ifdef __cplusplus
