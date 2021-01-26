@@ -50,7 +50,7 @@ namespace {
 // Size of request/result metadata fast message queue. Change to 0 to always use hwbinder buffer.
 static constexpr size_t kMetadataMsgQueueSize = 1 << 18 /* 256kB */;
 
-const int kBadFramesAfterStreamOn = 1; // drop x frames after streamOn to get rid of some initial
+const int kBadFramesAfterStreamOn = 4; // drop x frames after streamOn to get rid of some initial
                                        // bad frames. TODO: develop a better bad frame detection
                                        // method
 constexpr int MAX_RETRY = 15; // Allow retry some ioctl failures a few times to account for some
