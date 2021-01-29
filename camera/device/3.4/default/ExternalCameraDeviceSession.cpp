@@ -1859,7 +1859,6 @@ bool ExternalCameraDeviceSession::OutputThread::threadLoop() {
                     halBuf.acquireFence = relFence;
                 }
             } break;
-            case PixelFormat::YCBCR_420_888:
             case PixelFormat::YV12: {
                 IMapper::Rect outRect {0, 0,
                         static_cast<int32_t>(halBuf.width),
@@ -1903,6 +1902,7 @@ bool ExternalCameraDeviceSession::OutputThread::threadLoop() {
                     halBuf.acquireFence = relFence;
                 }
             } break;
+            case PixelFormat::YCBCR_420_888:
             case PixelFormat::IMPLEMENTATION_DEFINED:
             case PixelFormat::YCRCB_420_SP: {
                 if (req->frameIn->mFourcc == V4L2_PIX_FMT_YUYV){
