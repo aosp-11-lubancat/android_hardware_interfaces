@@ -243,8 +243,8 @@ void ExternalCameraProviderImpl_2_4::deviceAdded(const char* devName) {
             return;
         }
 
-        if (!(capability.device_caps & V4L2_CAP_VIDEO_CAPTURE)) {
-            ALOGW("%s device %s does not support VIDEO_CAPTURE", __FUNCTION__, devName);
+        if (!((capability.device_caps & V4L2_CAP_VIDEO_CAPTURE) || (capability.device_caps & V4L2_CAP_VIDEO_CAPTURE_MPLANE))) {
+            ALOGW("%s wpzz test device %s does not support VIDEO_CAPTURE", __FUNCTION__, devName);
             return;
         }
     }

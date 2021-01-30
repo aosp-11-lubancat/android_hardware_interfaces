@@ -39,6 +39,7 @@
 #include "MpiJpegDecoder.h"
 #include <utils/Singleton.h>
 #include "ExternalCameraMemManager.h"
+#include <linux/videodev2.h>
 
 namespace android {
 namespace hardware {
@@ -374,6 +375,8 @@ protected:
     SupportedV4L2Format mV4l2StreamingFmt;
     double mV4l2StreamingFps = 0.0;
     size_t mV4L2BufferCount = 0;
+    struct v4l2_plane planes[1];
+    struct v4l2_capability mCapability;
 
     static const int kBufferWaitTimeoutSec = 3; // TODO: handle long exposure (or not allowing)
     std::mutex mV4l2BufferLock; // protect the buffer count and condition below
