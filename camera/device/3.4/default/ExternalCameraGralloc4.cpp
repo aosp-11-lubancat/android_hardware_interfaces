@@ -15,7 +15,7 @@
  */
 
 #define LOG_TAG "ExCamGraBuf"
-#define LOG_NDEBUG 0
+//#define LOG_NDEBUG 0
 #include <log/log.h>
 #include <utils/threads.h>
 #include <utils/Log.h>
@@ -272,11 +272,11 @@ int lock(buffer_handle_t bufferHandle,
                                   uint32_t width,
                                   uint32_t height,
                                   void** out_addr) {
-    LOGD("lock buffer:%p   rect(%d, %d, %d, %d) flag: 0x%08x", bufferHandle, left, top, width, height, flags);
+    ALOGD("lock buffer:%p   rect(%d, %d, %d, %d) flag: 0x%08x", bufferHandle, left, top, width, height, flags);
 
     auto &mapper = get_mapperservice();
     auto buffer = const_cast<native_handle_t*>(bufferHandle);
-    LOGD("lock buffer pointer:%p", &buffer);
+    ALOGD("lock buffer pointer:%p", &buffer);
 
     IMapper::Rect accessRegion = {(int)left, (int)top, (int)width, (int)height};
 
@@ -304,11 +304,11 @@ int lock(buffer_handle_t bufferHandle,
 }
 
 int unlock(buffer_handle_t bufferHandle) {
-    LOGD("Unlock buffer:%p", bufferHandle);
+    ALOGD("Unlock buffer:%p", bufferHandle);
 
     auto &mapper = get_mapperservice();
     auto buffer = const_cast<native_handle_t*>(bufferHandle);
-    LOGD("Unlock buffer:%p", buffer);
+    ALOGD("Unlock buffer:%p", buffer);
 
     int releaseFence = -1;
     Error error;
@@ -376,7 +376,7 @@ int get_allocation_size(buffer_handle_t handle, uint64_t* allocation_size)
 
 status_t importBuffer(buffer_handle_t rawHandle,
                                       buffer_handle_t* outBufferHandle) {
-    LOGD("import rawBuffer :%p", rawHandle);
+    ALOGD("import rawBuffer :%p", rawHandle);
     Error error;
     auto &mapper = get_mapperservice();
     auto ret = mapper.importBuffer(android::hardware::hidl_handle(rawHandle), [&](const auto& tmpError, const auto& tmpBuffer) {
@@ -385,7 +385,7 @@ status_t importBuffer(buffer_handle_t rawHandle,
             return;
         }
         *outBufferHandle = static_cast<buffer_handle_t>(tmpBuffer);
-        LOGD("import outBuffer :%p", outBufferHandle);
+        ALOGD("import outBuffer :%p", outBufferHandle);
     });
 
     return static_cast<status_t>((ret.isOk()) ? error : kTransactionError);
@@ -403,7 +403,7 @@ status_t freeBuffer(buffer_handle_t bufferHandle) {
 }
 
 int get_share_fd(buffer_handle_t buffer, int* share_fd) {
-    LOGD(" buffer:%p", buffer);
+    ALOGV(" buffer:%p", buffer);
     int fd = -1;
     int err = 0;
     Mutex mLock;
@@ -582,7 +582,7 @@ static cam_mem_info_t* cam_mem_gralloc_ops_alloc(
     ExCamGralloc4::unlock(buf_handle);
 
     ret = ExCamGralloc4::get_allocation_size(buf_handle, &allocation_size);
-    LOGD("alloc buffer size(%lld)", allocation_size);
+    ALOGD("alloc buffer size(%lld)", allocation_size);
 
     ret = ExCamGralloc4::get_share_fd(buf_handle, &fd);
     if (ret) {
@@ -601,7 +601,7 @@ static cam_mem_info_t* cam_mem_gralloc_ops_alloc(
     mem->width = width;
     mem->height = height;
 
-    LOGD("alloc graphic buffer sucess,mem %p, vir_addr %p, fd %d",
+    ALOGD("alloc graphic buffer sucess,mem %p, vir_addr %p, fd %d",
         mem, mem_addr, mem->fd);
 
     return mem;
