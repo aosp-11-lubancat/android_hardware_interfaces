@@ -1114,8 +1114,9 @@ bool ExternalCameraDeviceSession::FormatConvertThread::threadLoop() {
 
     ALOGV("%s(%d)mShareFd(%d) mVirAddr(%p)!\n", __FUNCTION__, __LINE__, mShareFd, mVirAddr);
 
-    int tmpW = req->frameIn->mWidth;
-    int tmpH = req->frameIn->mHeight;
+    int tmpW = (req->frameIn->mWidth + 15) & (~15);
+    int tmpH = (req->frameIn->mHeight + 15) & (~15);
+
     if (req->frameIn->mFourcc == V4L2_PIX_FMT_MJPEG) {
 #ifdef RK_HW_JPEG_DECODER
         int ret = jpegDecoder(mShareFd, inData, inDataSize);
@@ -2187,7 +2188,7 @@ bool ExternalCameraDeviceSession::OutputThread::threadLoop() {
                                     halBuf.width, halBuf.height, frameCount);
                             fp = fopen(filename, "wb+");
                             if (fp != NULL) {
-                                fwrite((char*)mVirAddr, 1, tempFrameWidth*tempFrameHeight*1.5, fp);
+                                fwrite((char*)mVirAddr, 1, halBuf.width*halBuf.height*1.5, fp);
                                 fclose(fp);
                                 ALOGI("Write success YUV data to %s",filename);
                             } else {
