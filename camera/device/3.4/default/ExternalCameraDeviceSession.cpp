@@ -3114,7 +3114,13 @@ Status ExternalCameraDeviceSession::configureStreams(
         mStreamMap[config.streams[i].id].usage =
                 out->streams[i].v3_2.producerUsage = config.streams[i].usage |
                 BufferUsage::CPU_WRITE_OFTEN |
-                BufferUsage::CAMERA_OUTPUT | RK_GRALLOC_USAGE_SPECIFY_STRIDE;
+                BufferUsage::CAMERA_OUTPUT |
+            GRALLOC_USAGE_SW_READ_OFTEN |
+            GRALLOC_USAGE_SW_WRITE_NEVER |
+            GRALLOC_USAGE_HW_VIDEO_ENCODER |
+            GRALLOC_USAGE_HW_CAMERA_WRITE |
+            RK_GRALLOC_USAGE_SPECIFY_STRIDE|
+            GRALLOC_USAGE_PRIVATE_1;
         out->streams[i].v3_2.consumerUsage = 0;
         out->streams[i].v3_2.maxBuffers  = mV4L2BufferCount;
 
