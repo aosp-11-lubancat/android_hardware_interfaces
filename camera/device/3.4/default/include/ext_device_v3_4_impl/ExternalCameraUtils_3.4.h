@@ -139,6 +139,22 @@ public:
     virtual int getData(uint8_t** outData, size_t* dataSize) = 0;
 };
 
+class YuvFrame : public Frame {
+public:
+    YuvFrame(uint32_t w, uint32_t h, uint32_t fourcc, int bufIdx, uint8_t* data,
+              uint32_t dataSize);
+    ~YuvFrame() override;
+
+    virtual int getData(uint8_t** outData, size_t* dataSize) override;
+
+    const int mBufferIndex; // for later enqueue
+private:
+    std::mutex mLock;
+    const size_t mDataSize;
+    uint8_t* mData = nullptr;;
+};
+
+
 // A class provide access to a dequeued V4L2 frame buffer (mostly in MJPG format)
 // Also contains necessary information to enqueue the buffer back to V4L2 buffer queue
 class V4L2Frame : public Frame {
@@ -207,6 +223,7 @@ struct HalRequest {
     uint32_t frameNumber;
     common::V1_0::helper::CameraMetadata setting;
     sp<V4L2Frame> frameIn;
+    sp<YuvFrame> yuvframeIn;
     nsecs_t shutterTs;
     std::vector<HalStreamBuffer> buffers;
     unsigned long mShareFd;

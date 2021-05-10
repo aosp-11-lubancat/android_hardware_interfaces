@@ -40,6 +40,7 @@ struct bufferinfo_s{
     buffer_type_enum mBufType;
     uint32_t width;
     uint32_t height;
+    short mStatus; // 0:idle, 1:activel
 };
 
 typedef enum buffer_addr_e {
@@ -55,8 +56,11 @@ public :
     virtual int createPreviewBuffer(struct bufferinfo_s* previewbuf) = 0;
     virtual int destroyPreviewBuffer() = 0;
     virtual int flushCacheMem(buffer_type_enum buftype) = 0;
+    void setBufferStatus(enum buffer_type_enum buf_type,
+                                unsigned int buf_idx, int status);
     unsigned long getBufferAddr(enum buffer_type_enum buf_type,
             unsigned int buf_idx, buffer_addr_t addr_type);
+    int getIdleBufferIndex(enum buffer_type_enum buf_type);
     int dump();
 protected:
     struct bufferinfo_s* mPreviewBufferInfo;

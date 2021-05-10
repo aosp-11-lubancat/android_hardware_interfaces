@@ -81,6 +81,8 @@ cc_library_shared {
     srcs: [
         "ExternalCameraDevice.cpp",
         "ExternalCameraDeviceSession.cpp",
+        "ExternalFakeCameraDevice.cpp",
+        "ExternalFakeCameraDeviceSession.cpp",
         "ExternalCameraUtils.cpp",
         "RgaCropScale.cpp",
         "ExternalCameraMemManager.cpp",

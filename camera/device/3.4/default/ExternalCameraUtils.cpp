@@ -45,6 +45,22 @@ namespace implementation {
 Frame::Frame(uint32_t width, uint32_t height, uint32_t fourcc) :
         mWidth(width), mHeight(height), mFourcc(fourcc) {}
 
+YuvFrame::YuvFrame(
+        uint32_t w, uint32_t h, uint32_t fourcc,
+        int bufIdx, uint8_t* data, uint32_t dataSize) :
+        Frame(w, h, fourcc),
+        mBufferIndex(bufIdx), mData(data), mDataSize(dataSize) {}
+
+YuvFrame::~YuvFrame() {
+
+}
+
+int YuvFrame::getData(uint8_t** outData, size_t* dataSize) {
+    *outData = mData;
+    *dataSize = mDataSize;
+    return 0;
+}
+
 V4L2Frame::V4L2Frame(
         uint32_t w, uint32_t h, uint32_t fourcc,
         int bufIdx, int fd, uint32_t dataSize, uint64_t offset) :

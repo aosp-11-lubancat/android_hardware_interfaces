@@ -15,7 +15,7 @@
  */
 
 #define LOG_TAG "CamPrvdr@2.4-external"
-//#define LOG_NDEBUG 0
+#define LOG_NDEBUG 0
 #include <log/log.h>
 
 #include <regex>
@@ -27,6 +27,9 @@
 #include "ExternalCameraDevice_3_4.h"
 #include "ExternalCameraDevice_3_5.h"
 #include "ExternalCameraDevice_3_6.h"
+#include "ExternalFakeCameraDevice_3_4.h"
+
+#define FAKE_CAMERA_ENABLE 0
 
 namespace android {
 namespace hardware {
@@ -147,10 +150,11 @@ Return<void> ExternalCameraProviderImpl_2_4::getCameraDeviceInterface_V1_x(
 Return<void> ExternalCameraProviderImpl_2_4::getCameraDeviceInterface_V3_x(
         const hidl_string& cameraDeviceName,
         ICameraProvider::getCameraDeviceInterface_V3_x_cb _hidl_cb) {
-
+    ALOGD("cameraDeviceName:%s", cameraDeviceName.c_str());
     std::string cameraDevicePath, deviceVersion;
     bool match = matchDeviceName(mCfg.cameraIdOffset, cameraDeviceName,
                                  &deviceVersion, &cameraDevicePath);
+    ALOGD("cameraDevicePath:%s", cameraDevicePath.c_str());
     if (!match) {
         _hidl_cb(Status::ILLEGAL_ARGUMENT, nullptr);
         return Void();
@@ -162,6 +166,30 @@ Return<void> ExternalCameraProviderImpl_2_4::getCameraDeviceInterface_V3_x(
         return Void();
     }
 
+    if (std::atoi(cameraDevicePath.c_str() + kDevicePrefixLen) >= 30) {
+        ALOGV("Constructing v3.4 external fake camera device");
+        sp<device::V3_4::implementation::ExternalFakeCameraDevice> deviceImpl = 
+            new device::V3_4::implementation::ExternalFakeCameraDevice(
+                    cameraDevicePath, mCfg);
+        if (deviceImpl == nullptr || deviceImpl->isInitFailed()) {
+            ALOGE("%s: camera device %s init failed!", __FUNCTION__, cameraDevicePath.c_str());
+            _hidl_cb(Status::INTERNAL_ERROR, nullptr);
+            return Void();
+        }
+    
+        IF_ALOGV() {
+            deviceImpl->getInterface()->interfaceChain([](
+                ::android::hardware::hidl_vec<::android::hardware::hidl_string> interfaceChain) {
+                    ALOGV("Device interface chain:");
+                    for (auto iface : interfaceChain) {
+                        ALOGV("  %s", iface.c_str());
+                    }
+                });
+        }
+    
+        _hidl_cb (Status::OK, deviceImpl->getInterface());
+    } else {
+ 
     sp<device::V3_4::implementation::ExternalCameraDevice> deviceImpl;
     switch (mPreferredHal3MinorVersion) {
         case 4: {
@@ -205,7 +233,7 @@ Return<void> ExternalCameraProviderImpl_2_4::getCameraDeviceInterface_V3_x(
     }
 
     _hidl_cb (Status::OK, deviceImpl->getInterface());
-
+    }
     return Void();
 }
 
@@ -229,6 +257,16 @@ void ExternalCameraProviderImpl_2_4::addExternalCamera(const char* devName) {
 }
 
 void ExternalCameraProviderImpl_2_4::deviceAdded(const char* devName) {
+    if (std::atoi(devName + kDevicePrefixLen) >= 30)
+    {
+        sp<device::V3_4::implementation::ExternalFakeCameraDevice> deviceImpl =
+            new device::V3_4::implementation::ExternalFakeCameraDevice(devName, mCfg);
+        if (deviceImpl == nullptr || deviceImpl->isInitFailed()) {
+            ALOGW("%s: Attempt to init camera device %s failed!", __FUNCTION__, devName);
+            return;
+        }
+        deviceImpl.clear();
+    } else {
     {
         base::unique_fd fd(::open(devName, O_RDWR));
         if (fd.get() < 0) {
@@ -256,6 +294,7 @@ void ExternalCameraProviderImpl_2_4::deviceAdded(const char* devName) {
         return;
     }
     deviceImpl.clear();
+    }
 
     addExternalCamera(devName);
     return;
@@ -315,6 +354,9 @@ bool ExternalCameraProviderImpl_2_4::HotplugThread::threadLoop() {
             }
         }
     }
+#if FAKE_CAMERA_ENABLE
+    mParent->deviceAdded("/dev/video30");
+#endif
     closedir(devdir);
 
     // Watch new video devices
