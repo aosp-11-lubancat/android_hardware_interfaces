@@ -39,8 +39,8 @@ namespace {
 // Other formats to consider in the future:
 // * V4L2_PIX_FMT_YVU420 (== YV12)
 // * V4L2_PIX_FMT_YVYU (YVYU: can be converted to YV12 or other YUV420_888 formats)
-const std::array<uint32_t, /*size*/ 4> kSupportedFourCCs{
-    {V4L2_PIX_FMT_MJPEG, V4L2_PIX_FMT_NV12, V4L2_PIX_FMT_YUYV, V4L2_PIX_FMT_Z16}};  // double braces required in C++11
+const std::array<uint32_t, /*size*/ 5> kSupportedFourCCs{
+    {V4L2_PIX_FMT_MJPEG, V4L2_PIX_FMT_NV12, V4L2_PIX_FMT_H264, V4L2_PIX_FMT_YUYV, V4L2_PIX_FMT_Z16}};  // double braces required in C++11
 
 constexpr int MAX_RETRY = 5; // Allow retry v4l2 open failures a few times.
 constexpr int OPEN_RETRY_SLEEP_US = 100000; // 100ms * MAX_RETRY = 0.5 seconds
@@ -275,6 +275,7 @@ status_t ExternalCameraDevice::initAvailableCapabilities(
         switch (fmt.fourcc) {
             case V4L2_PIX_FMT_Z16: hasDepth = true; break;
             case V4L2_PIX_FMT_MJPEG: hasColor = true; break;
+            case V4L2_PIX_FMT_H264: hasColor = true; break;
             case V4L2_PIX_FMT_YUYV: hasColor = true; break;
             case V4L2_PIX_FMT_NV12: hasColor = true; break;
             default: ALOGW("%s: Unsupported format found", __FUNCTION__);
@@ -701,6 +702,7 @@ status_t ExternalCameraDevice::initOutputCharsKeys(
     bool hasColor = false;
     bool hasColor_yuv = false;
     bool hasColor_nv12 = false;
+    bool hasColor_h264 = false;
 
     // For V4L2_PIX_FMT_Z16
     std::array<int, /*size*/ 1> halDepthFormats{{HAL_PIXEL_FORMAT_Y16}};
@@ -721,6 +723,9 @@ status_t ExternalCameraDevice::initOutputCharsKeys(
                 break;
             case V4L2_PIX_FMT_NV12:
                 hasColor_nv12 = true;
+                break;
+            case V4L2_PIX_FMT_H264:
+                hasColor_h264 = true;
                 break;
             default:
                 ALOGW("%s: format %c%c%c%c is not supported!", __FUNCTION__,
@@ -751,6 +756,13 @@ status_t ExternalCameraDevice::initOutputCharsKeys(
     }
     if (hasColor_nv12) {
         initOutputCharskeysByFormat(metadata, V4L2_PIX_FMT_NV12, halFormats,
+                ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS_OUTPUT,
+                ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS,
+                ANDROID_SCALER_AVAILABLE_MIN_FRAME_DURATIONS,
+                ANDROID_SCALER_AVAILABLE_STALL_DURATIONS);
+    }
+    if (hasColor_h264) {
+        initOutputCharskeysByFormat(metadata, V4L2_PIX_FMT_H264, halFormats,
                 ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS_OUTPUT,
                 ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS,
                 ANDROID_SCALER_AVAILABLE_MIN_FRAME_DURATIONS,

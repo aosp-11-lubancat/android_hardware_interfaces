@@ -37,6 +37,7 @@
 #include "android-base/unique_fd.h"
 #include "ExternalCameraUtils_3.4.h"
 #include "MpiJpegDecoder.h"
+#include "rkvpu_dec_api.h"
 #include <utils/Singleton.h>
 #include "ExternalCameraMemManager.h"
 #include <linux/videodev2.h>
@@ -198,6 +199,9 @@ struct ExternalCameraDeviceSession : public virtual RefBase,
         ~FormatConvertThread();
         void createJpegDecoder();
         void destroyJpegDecoder();
+		void createH264Decoder(int w, int h);
+		int h264Decoder(unsigned long dst_fd, uint8_t* inData, size_t inDataSize);
+		void destroyH264Decoder();
         Status submitRequest(const std::shared_ptr<HalRequest>&);
         virtual bool threadLoop() override;
 
@@ -212,6 +216,8 @@ struct ExternalCameraDeviceSession : public virtual RefBase,
 
         MpiJpegDecoder mHWJpegDecoder;
         MpiJpegDecoder::OutputFrame_t mHWDecoderFrameOut;
+
+		RKHWDecApi mRkHwDecApi;
         sp<OutputThread> mFmtOutputThread;
         mutable std::mutex mRequestListLock;      // Protect acccess to mRequestList,
                                                   // mProcessingRequest and mProcessingFrameNumer
@@ -370,6 +376,8 @@ protected:
     bool mInitFail = false;
     bool mFirstRequest = false;
     common::V1_0::helper::CameraMetadata mLatestReqSetting;
+
+	bool isNeedCheckIFrame = true;
 
     bool mV4l2Streaming = false;
     SupportedV4L2Format mV4l2StreamingFmt;
