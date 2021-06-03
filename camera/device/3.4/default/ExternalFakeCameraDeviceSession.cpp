@@ -2682,19 +2682,37 @@ sp<YuvFrame> ExternalFakeCameraDeviceSession::dequeueV4l2FrameLocked(/*out*/nsec
     unsigned long viraddr = mFormatConvertThread->mCamMemManager->getBufferAddr(
             PREVIEWBUFFER, index, buffer_addr_vir);
 
-    FILE* fp =NULL;
-    char filename[128];
-    filename[0] = 0x00;
-    sprintf(filename, "/data/camera/camera_%dx%d.yuv",
+    size_t size = 0;
+    if (mV4l2StreamingFmt.fourcc == V4L2_PIX_FMT_MJPEG) {
+        FILE* fp =NULL;
+        char filename[128];
+        filename[0] = 0x00;
+        sprintf(filename, "/data/camera/camera_%dx%d.jpg",
             mV4l2StreamingFmt.width, mV4l2StreamingFmt.height);
-    fp = fopen(filename, "r+");
-    if (fp != NULL) {
-        fread((char*)viraddr,1,mV4l2StreamingFmt.width*mV4l2StreamingFmt.height*1.5,fp);
-        fclose(fp);
-        ALOGV("read success YUV data to %s",filename);
-    } else {
-        ALOGE("Create %s failed(%d, %s)",filename,fp, strerror(errno));
+        fp = fopen(filename, "r+");
+        if (fp != NULL) {
+            size = fread((char*)viraddr,1,mV4l2StreamingFmt.width*mV4l2StreamingFmt.height*1.5,fp);
+            fclose(fp);
+            ALOGD("read success jpeg data to %s size:%d",filename, size);
+        } else {
+            ALOGE("Create %s failed(%d, %s)",filename,fp, strerror(errno));
+        }
+    } else if (mV4l2StreamingFmt.fourcc == V4L2_PIX_FMT_NV12) {
+        FILE* fp =NULL;
+        char filename[128];
+        filename[0] = 0x00;
+        sprintf(filename, "/data/camera/camera_%dx%d.yuv",
+            mV4l2StreamingFmt.width, mV4l2StreamingFmt.height);
+        fp = fopen(filename, "r+");
+        if (fp != NULL) {
+            size = fread((char*)viraddr,1,mV4l2StreamingFmt.width*mV4l2StreamingFmt.height*1.5,fp);
+            fclose(fp);
+            ALOGV("read success NV12 data to %s size:%d",filename, size);
+        } else {
+            ALOGE("Create %s failed(%d, %s)",filename,fp, strerror(errno));
+        }
     }
+    
     mFormatConvertThread->mCamMemManager->setBufferStatus(
             PREVIEWBUFFER, index, 1);
 
@@ -2707,7 +2725,7 @@ sp<YuvFrame> ExternalFakeCameraDeviceSession::dequeueV4l2FrameLocked(/*out*/nsec
 
     return new YuvFrame(
             mV4l2StreamingFmt.width, mV4l2StreamingFmt.height, mV4l2StreamingFmt.fourcc,
-            index, (uint8_t*) viraddr, mV4l2StreamingFmt.width * mV4l2StreamingFmt.height * 3 / 2);
+            index, (uint8_t*) viraddr, size);
 
 }
 

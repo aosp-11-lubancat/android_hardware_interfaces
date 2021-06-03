@@ -45,6 +45,8 @@ const std::array<uint32_t, /*size*/ 4> kSupportedFourCCs{
 constexpr int MAX_RETRY = 5; // Allow retry v4l2 open failures a few times.
 constexpr int OPEN_RETRY_SLEEP_US = 100000; // 100ms * MAX_RETRY = 0.5 seconds
 
+const uint32_t kDefaultFourCc = V4L2_PIX_FMT_MJPEG;
+
 } // anonymous namespace
 
 const std::regex kDevicePathRE("/dev/video([0-9]+)");
@@ -996,21 +998,21 @@ void ExternalFakeCameraDevice::initSupportedFormatsLocked(int fd) {
     SupportedV4L2Format format_1080p {
                             .width = 1920,
                             .height = 1080,
-                            .fourcc = V4L2_PIX_FMT_NV12
+                            .fourcc = kDefaultFourCc
                         };
     for (SupportedV4L2Format::FrameRate fps : fps)
         format_1080p.frameRates.push_back(fps);
     SupportedV4L2Format format_720p {
                             .width = 1280,
                             .height = 720,
-                            .fourcc = V4L2_PIX_FMT_NV12
+                            .fourcc = kDefaultFourCc
                         };
     for (SupportedV4L2Format::FrameRate fps : fps)
         format_720p.frameRates.push_back(fps);
     SupportedV4L2Format format_480p {
                             .width = 640,
                             .height = 480,
-                            .fourcc = V4L2_PIX_FMT_NV12
+                            .fourcc = kDefaultFourCc
                         };
     for (SupportedV4L2Format::FrameRate fps : fps)
         format_480p.frameRates.push_back(fps);
