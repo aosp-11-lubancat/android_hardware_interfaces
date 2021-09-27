@@ -183,10 +183,12 @@ struct ExternalCameraDeviceSession : public virtual RefBase,
         mutable std::mutex mBufferLock; // Protect access to intermediate buffers
         sp<AllocatedFrame> mYu12Frame;
         sp<AllocatedFrame> mYu12ThumbFrame;
+        sp<AllocatedFrame> mTempYu12Frame;
         std::unordered_map<Size, sp<AllocatedFrame>, SizeHasher> mIntermediateBuffers;
         std::unordered_map<Size, sp<AllocatedFrame>, SizeHasher> mScaledYu12Frames;
         YCbCrLayout mYu12FrameLayout;
         YCbCrLayout mYu12ThumbFrameLayout;
+        YCbCrLayout mYu12TempLayout;
         uint32_t mBlobBufferSize = 0; // 0 -> HAL derive buffer size, else: use given size
 
         std::string mExifMake;

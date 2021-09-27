@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 #define LOG_TAG "ExtCamDevSsn@3.4"
-//#define LOG_NDEBUG 0
+#define LOG_NDEBUG 0
 #define ATRACE_TAG ATRACE_TAG_CAMERA
 #include <log/log.h>
 
@@ -40,6 +40,17 @@
 #define RK_GRALLOC_USAGE_SPECIFY_STRIDE 1ULL << 30
 
 //#define DUMP_YUV
+typedef struct Camerawindow {
+    int left;
+    int right;
+    int top;
+    int bottom;
+    int weight;
+    int width;
+    int height;
+} Camerawindow_t;
+Camerawindow_t crop = {};
+static bool isJpegNeedCropScale = false;
 
 namespace android {
 namespace hardware {
@@ -2023,6 +2034,9 @@ bool ExternalCameraDeviceSession::OutputThread::threadLoop() {
     bool isBlobOrYv12 = false;
     int tempFrameWidth  = mYu12Frame->mWidth;
     int tempFrameHeight = mYu12Frame->mHeight;
+    ALOGD("%s(%d): mYu12Frame widthxheight: %dx%d",
+            __FUNCTION__, __LINE__, mYu12Frame->mWidth, mYu12Frame->mHeight);
+
     for (auto& halBuf : req->buffers) {
         if(halBuf.format == PixelFormat::BLOB || halBuf.format == PixelFormat::YV12) {
             isBlobOrYv12 = true;
@@ -2036,6 +2050,70 @@ bool ExternalCameraDeviceSession::OutputThread::threadLoop() {
             tempFrameHeight = ((tempFrameHeight + 15) & (~15));
         }
     }
+
+#if 1
+    //wpzz add
+    if (mCameraCharacteristics.exists(ANDROID_SCALER_AVAILABLE_MAX_DIGITAL_ZOOM)) {
+        float max_digital_zoom = 1.0f;
+        camera_metadata_ro_entry entry = mCameraCharacteristics.find(ANDROID_SCALER_AVAILABLE_MAX_DIGITAL_ZOOM);
+        max_digital_zoom = entry.data.f[0];
+        ALOGD("%s: wpzz max_digital_zoom value(%f)",__FUNCTION__, max_digital_zoom);
+    } else {
+        ALOGD("%s: wpzz ANDROID_SCALER_AVAILABLE_MAX_DIGITAL_ZOOM not set",__FUNCTION__);
+    }
+    Camerawindow_t mApa = {};
+    int mapleft, maptop, mapwidth, mapheight;
+    float wratio, hratio, hoffratio, voffratio;
+    camera2::RgaCropScale::Params rgain, rgaout;
+
+    // android.scaler
+    if (req->setting.exists(ANDROID_SCALER_CROP_REGION)) {
+        camera_metadata_entry entry =
+            req->setting.find(ANDROID_SCALER_CROP_REGION);
+        if (entry.count == 0) {
+            ALOGE("%s: cannot find crop region!", __FUNCTION__);
+            return -EINVAL;
+        }
+        crop.left= entry.data.i32[0];
+        crop.top= entry.data.i32[1];
+        crop.width= entry.data.i32[2];
+        crop.height= entry.data.i32[3];
+
+        camera_metadata_ro_entry active_array_entry =
+            mCameraCharacteristics.find(ANDROID_SENSOR_INFO_ACTIVE_ARRAY_SIZE);
+        if (active_array_entry.count == 0) {
+            ALOGE("%s: cannot find active array size!", __FUNCTION__);
+            return -EINVAL;
+        }
+        mApa.width = active_array_entry.data.i32[2]; //width
+        mApa.height = active_array_entry.data.i32[3]; //height
+
+        ALOGD("%s: crop region(%d,%d,%d,%d) mApa (%d, %d)",__FUNCTION__,
+                    crop.left, crop.top, crop.width, crop.height,
+                    mApa.width, mApa.height);
+        wratio = (float)crop.width / mApa.width;
+        hratio = (float)crop.height / mApa.height;
+        hoffratio = (float)crop.left / mApa.width;
+        voffratio = (float)crop.top / mApa.height;
+        mapleft = mYu12Frame->mWidth * hoffratio;
+        maptop = mYu12Frame->mHeight * voffratio;
+        mapwidth = mYu12Frame->mWidth * wratio;
+        mapheight = mYu12Frame->mHeight * hratio;
+        // should align to 2
+        mapleft &= ~0x1;
+        maptop &= ~0x1;
+        mapwidth &= ~0x3;
+        mapheight &= ~0x3;
+
+        if(crop.width ==  mApa.width && crop.height == mApa.height && !isBlobOrYv12) {
+            ALOGD("%s(%d): no need SCALER & CROP.\n",__FUNCTION__, __LINE__);
+        }
+        else
+        {
+            isJpegNeedCropScale = true;
+        }
+    }
+#endif
 
     if (isBlobOrYv12 && req->frameIn->mFourcc == V4L2_PIX_FMT_MJPEG) {
         /*LOGD("format is BLOB or YV12,use software jpeg decoder, framenumber(%d)", req->frameNumber);
@@ -2052,19 +2130,52 @@ bool ExternalCameraDeviceSession::OutputThread::threadLoop() {
         input.cb = (uint8_t*)(req->mVirAddr) + tempFrameWidth * tempFrameHeight;
         input.cStride = tempFrameWidth; //mYu12Frame->mWidth;
         LOGD("format is BLOB or YV12, use software NV12ToI420");
-
-        int ret = libyuv::NV12ToI420(
+        ATRACE_BEGIN("NV12toI420");
+        int res = libyuv::NV12ToI420(
                 static_cast<uint8_t*>(input.y),
                 input.yStride,
                 static_cast<uint8_t*>(input.cb),
                 input.cStride,
+                static_cast<uint8_t*>(mYu12TempLayout.y),
+                mYu12TempLayout.yStride,
+                static_cast<uint8_t*>(mYu12TempLayout.cb),
+                mYu12TempLayout.cStride,
+                static_cast<uint8_t*>(mYu12TempLayout.cr),
+                mYu12TempLayout.cStride,
+                mTempYu12Frame->mWidth, mTempYu12Frame->mHeight);
+        ATRACE_END();
+        IMapper::Rect inputCrop;
+        inputCrop.left = mapleft;
+        inputCrop.top = maptop;
+        inputCrop.width = mapwidth;
+        inputCrop.height = mapheight;
+        YCbCrLayout croppedLayout;
+        res = mTempYu12Frame->getCroppedLayout(inputCrop, &croppedLayout);
+        if (res != 0) {
+            ALOGE("%s(%d): failed to crop input image %dx%d to output size %dx%d",
+                    __FUNCTION__, __LINE__, mTempYu12Frame->mWidth, mTempYu12Frame->mHeight, inputCrop.width, inputCrop.height);
+            return res;
+        }
+        ALOGD("%s(%d) wpzz \n", __FUNCTION__, __LINE__);
+        res = libyuv::I420Scale(
+                static_cast<uint8_t*>(croppedLayout.y),
+                croppedLayout.yStride,
+                static_cast<uint8_t*>(croppedLayout.cb),
+                croppedLayout.cStride,
+                static_cast<uint8_t*>(croppedLayout.cr),
+                croppedLayout.cStride,
+                inputCrop.width,
+                inputCrop.height,
                 static_cast<uint8_t*>(mYu12FrameLayout.y),
                 mYu12FrameLayout.yStride,
                 static_cast<uint8_t*>(mYu12FrameLayout.cb),
                 mYu12FrameLayout.cStride,
                 static_cast<uint8_t*>(mYu12FrameLayout.cr),
                 mYu12FrameLayout.cStride,
-                mYu12Frame->mWidth, mYu12Frame->mHeight);
+                mYu12Frame->mWidth,
+                mYu12Frame->mHeight,
+                // TODO: b/72261744 see if we can use better filter without losing too much perf
+                libyuv::FilterMode::kFilterNone);
 
         if (res != 0) {
             // For some webcam, the first few V4L2 frames might be malformed...
@@ -2474,11 +2585,42 @@ bool ExternalCameraDeviceSession::OutputThread::threadLoop() {
                     ALOGV("%s(%d) halbuf_wxh(%dx%d) frameNumber(%d)", __FUNCTION__, __LINE__,
                         halBuf.width, halBuf.height, req->frameNumber);
 
+                if (isJpegNeedCropScale) {
+                    // do digital zoom
+                    //camera2::RgaCropScale::Params rgain, rgaout;
+                    rgain.fd = req->mShareFd;
+                    rgain.fmt = HAL_PIXEL_FORMAT_YCrCb_NV12;
+                    //rgain.vir_addr = reinterpret_cast<char*>(req->mVirAddr);
+                    rgain.mirror = false;
+                    rgain.width = mapwidth;
+                    rgain.height = mapheight;
+                    rgain.offset_x = mapleft;
+                    rgain.offset_y = maptop;
+                    rgain.width_stride = tempFrameWidth;
+                    rgain.height_stride = tempFrameHeight;
+
+                    rgaout.fd = handle_fd;
+                    rgaout.fmt = HAL_PIXEL_FORMAT_YCrCb_NV12;
+                    //rgaout.vir_addr = reinterpret_cast<char*>(halBuf.bufPtr);
+                    rgaout.mirror = false;
+                    rgaout.width = halBuf.width;
+                    rgaout.height = halBuf.height;
+                    rgaout.offset_x = 0;
+                    rgaout.offset_y = 0;
+                    rgaout.width_stride = halBuf.width;
+                    rgaout.height_stride = halBuf.height;
+                    ALOGD("%s: wpzz digital zoom by RGA start!\n", __FUNCTION__);
+                    if (camera2::RgaCropScale::CropScaleNV12Or21(&rgain, &rgaout)) {
+                        ALOGW("%s: wpzz digital zoom by RGA failed!\n", __FUNCTION__);
+                    }
+                } else {
                     camera2::RgaCropScale::rga_nv12_scale_crop(
                         tempFrameWidth, tempFrameHeight, req->mShareFd, handle_fd,
                         halBuf.width, halBuf.height, 100, false, true,
                         (halBuf.format == PixelFormat::YCRCB_420_SP), is16Align,
                         req->frameIn->mFourcc == V4L2_PIX_FMT_YUYV);
+                    ALOGD("%s: ANDROID_SCALER_CROP_REGION not set",__FUNCTION__);
+                }
 #ifdef DUMP_YUV
                     {
                         void* mVirAddr = NULL;
@@ -2574,6 +2716,18 @@ Status ExternalCameraDeviceSession::OutputThread::allocateIntermediateBuffers(
         int ret = mYu12ThumbFrame->allocate(&mYu12ThumbFrameLayout);
         if (ret != 0) {
             ALOGE("%s: allocating YU12 thumb frame failed!", __FUNCTION__);
+            return Status::INTERNAL_ERROR;
+        }
+    }
+
+    // Allocating Temp Digital zoom frame
+    if (mTempYu12Frame == nullptr || mTempYu12Frame->mWidth != v4lSize.width ||
+            mTempYu12Frame->mHeight != v4lSize.height) {
+        mTempYu12Frame.clear();
+        mTempYu12Frame = new AllocatedFrame(v4lSize.width, v4lSize.height);
+        int ret = mTempYu12Frame->allocate(&mYu12TempLayout);
+        if (ret != 0) {
+            ALOGE("%s: allocating YU12 frame failed!", __FUNCTION__);
             return Status::INTERNAL_ERROR;
         }
     }

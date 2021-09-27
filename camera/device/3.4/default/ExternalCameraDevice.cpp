@@ -408,7 +408,7 @@ status_t ExternalCameraDevice::initDefaultCharsKeys(
 
     // android.scaler
     // TODO: b/72263447 V4L2_CID_ZOOM_*
-    const float scalerAvailableMaxDigitalZoom[] = {1};
+    const float scalerAvailableMaxDigitalZoom[] = {12.0};
     UPDATE(ANDROID_SCALER_AVAILABLE_MAX_DIGITAL_ZOOM,
            scalerAvailableMaxDigitalZoom,
            ARRAY_SIZE(scalerAvailableMaxDigitalZoom));
@@ -582,7 +582,7 @@ status_t ExternalCameraDevice::initCameraControlsCharsKeys(int,
     UPDATE(ANDROID_CONTROL_AWB_LOCK_AVAILABLE, &awbLockAvailable, 1);
 
     // TODO: V4L2_CID_ZOOM_*
-    const float scalerAvailableMaxDigitalZoom[] = {1};
+    const float scalerAvailableMaxDigitalZoom[] = {12.0};
     UPDATE(ANDROID_SCALER_AVAILABLE_MAX_DIGITAL_ZOOM,
            scalerAvailableMaxDigitalZoom,
            ARRAY_SIZE(scalerAvailableMaxDigitalZoom));
