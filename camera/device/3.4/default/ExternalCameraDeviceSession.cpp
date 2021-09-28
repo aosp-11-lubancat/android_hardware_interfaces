@@ -33,6 +33,7 @@
 
 #include <jpeglib.h>
 #include "RgaCropScale.h"
+#include <RockchipRga.h>
 #include "ExternalCameraGralloc4.h"
 #define NV12_HW_CONVERT
 #define PLANES_NUM 1
