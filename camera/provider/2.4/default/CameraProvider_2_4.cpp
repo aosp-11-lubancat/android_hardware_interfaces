@@ -17,9 +17,11 @@
 #include "CameraProvider_2_4.h"
 #include "LegacyCameraProviderImpl_2_4.h"
 #include "ExternalCameraProviderImpl_2_4.h"
+#include "VirtualCameraProviderImpl_2_4.h"
 
 const char *kLegacyProviderName = "legacy/0";
 const char *kExternalProviderName = "external/0";
+const char *kVirtualProviderName = "virtual/0";
 
 namespace android {
 namespace hardware {
@@ -54,6 +56,8 @@ ICameraProvider* HIDL_FETCH_ICameraProvider(const char* name) {
         provider = getProviderImpl<LegacyCameraProviderImpl_2_4>();
     } else if (strcmp(name, kExternalProviderName) == 0) {
         provider = getProviderImpl<ExternalCameraProviderImpl_2_4>();
+    } else if (strcmp(name, kVirtualProviderName) == 0) {
+        provider = getProviderImpl<VirtualCameraProviderImpl_2_4>();
     } else {
         ALOGE("%s: unknown instance name: %s", __FUNCTION__, name);
     }
