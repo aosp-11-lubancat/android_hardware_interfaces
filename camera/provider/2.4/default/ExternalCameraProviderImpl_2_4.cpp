@@ -166,7 +166,7 @@ Return<void> ExternalCameraProviderImpl_2_4::getCameraDeviceInterface_V3_x(
         return Void();
     }
 
-    if (std::atoi(cameraDevicePath.c_str() + kDevicePrefixLen) >= 30) {
+    if (std::atoi(cameraDevicePath.c_str() + kDevicePrefixLen) >= 100) {
         ALOGV("Constructing v3.4 external fake camera device");
         sp<device::V3_4::implementation::ExternalFakeCameraDevice> deviceImpl = 
             new device::V3_4::implementation::ExternalFakeCameraDevice(
@@ -257,7 +257,7 @@ void ExternalCameraProviderImpl_2_4::addExternalCamera(const char* devName) {
 }
 
 void ExternalCameraProviderImpl_2_4::deviceAdded(const char* devName) {
-    if (std::atoi(devName + kDevicePrefixLen) >= 30)
+    if (std::atoi(devName + kDevicePrefixLen) >= 100)
     {
         sp<device::V3_4::implementation::ExternalFakeCameraDevice> deviceImpl =
             new device::V3_4::implementation::ExternalFakeCameraDevice(devName, mCfg);
@@ -355,7 +355,7 @@ bool ExternalCameraProviderImpl_2_4::HotplugThread::threadLoop() {
         }
     }
 #if FAKE_CAMERA_ENABLE
-    mParent->deviceAdded("/dev/video30");
+    mParent->deviceAdded("/dev/video100");
 #endif
     closedir(devdir);
 
