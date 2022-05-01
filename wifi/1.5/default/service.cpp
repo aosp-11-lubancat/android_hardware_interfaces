@@ -27,6 +27,8 @@
 #include "wifi_legacy_hal_factory.h"
 #include "wifi_mode_controller.h"
 
+extern "C" int wifi_load_driver();
+
 using android::hardware::configureRpcThreadpool;
 using android::hardware::joinRpcThreadpool;
 using android::hardware::LazyServiceRegistrar;
@@ -50,6 +52,7 @@ int main(int /*argc*/, char** argv) {
         argv, android::base::LogdLogger(android::base::SYSTEM));
     LOG(INFO) << "Wifi Hal is booting up...";
 
+    wifi_load_driver();
     configureRpcThreadpool(1, true /* callerWillJoin */);
 
     const auto iface_tool =
