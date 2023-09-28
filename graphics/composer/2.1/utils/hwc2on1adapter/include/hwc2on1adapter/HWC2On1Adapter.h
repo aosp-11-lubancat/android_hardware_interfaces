@@ -202,6 +202,7 @@ private:
             HWC2::Error acceptChanges();
             HWC2::Error createLayer(hwc2_layer_t* outLayerId);
             HWC2::Error destroyLayer(hwc2_layer_t layerId);
+            HWC2::Error destroyLayers();
             HWC2::Error getActiveConfig(hwc2_config_t* outConfigId);
             HWC2::Error getAttribute(hwc2_config_t configId,
                     HWC2::Attribute attribute, int32_t* outValue);
@@ -278,6 +279,10 @@ private:
 
             void markGeometryChanged() { mGeometryChanged = true; }
             void resetGeometryMarker() { mGeometryChanged = false;}
+            void markHasPrepare() { mHasPrepare = true; }
+            void resetHasPrepare() { mHasPrepare = false;}
+            void markHasSet() { mHasSet = true; }
+            void resetHasSet() { mHasSet = false;}
         private:
             class Config {
                 public:
@@ -458,6 +463,8 @@ private:
             // updated with anything other than a buffer since last call to
             // Display::set()
             bool mGeometryChanged;
+            bool mHasPrepare;
+            bool mHasSet;
     };
 
     // Utility template calling a Display object method directly based on the
@@ -599,6 +606,7 @@ private:
             HWC2::Transform mTransform;
             std::vector<hwc_rect_t> mVisibleRegion;
 
+            android_dataspace_t mDataSpace;
             uint32_t mZ;
 
             DeferredFence mReleaseFence;

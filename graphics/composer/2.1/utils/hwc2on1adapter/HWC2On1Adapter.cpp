@@ -528,7 +528,9 @@ HWC2On1Adapter::Display::Display(HWC2On1Adapter& device, HWC2::DisplayType type)
     mHwc1LayerMap(),
     mNumAvailableRects(0),
     mNextAvailableRect(nullptr),
-    mGeometryChanged(false)
+    mGeometryChanged(false),
+    mHasPrepare(false),
+    mHasSet(false)
     {}
 
 Error HWC2On1Adapter::Display::acceptChanges() {
@@ -786,8 +788,7 @@ Error HWC2On1Adapter::Display::getType(int32_t* outType) {
 
 Error HWC2On1Adapter::Display::present(int32_t* outRetireFence) {
     std::unique_lock<std::recursive_mutex> lock(mStateMutex);
-
-    if (mChanges) {
+    if (mChanges && !mHasSet) {
         Error error = mDevice.setAllDisplays();
         if (error != Error::None) {
             ALOGE("[%" PRIu64 "] present: setAllDisplaysFailed (%s)", mId,
@@ -849,6 +850,12 @@ Error HWC2On1Adapter::Display::setColorMode(android_color_mode_t mode) {
     std::unique_lock<std::recursive_mutex> lock (mStateMutex);
 
     ALOGV("[%" PRIu64 "] setColorMode(%d)", mId, mode);
+    if (mode == -1)
+        return Error::BadParameter;
+
+    if (mode) {
+        return Error::None;
+    }
 
     if (mode == mActiveColorMode) {
         return Error::None;
@@ -903,6 +910,8 @@ static bool isValid(PowerMode mode) {
         case PowerMode::DozeSuspend: // Fall-through
         case PowerMode::Doze: // Fall-through
         case PowerMode::On: return true;
+        default:
+            return false;
     }
 }
 
@@ -963,7 +972,6 @@ Error HWC2On1Adapter::Display::setVsyncEnabled(Vsync enable) {
             mHwc1Id, HWC_EVENT_VSYNC, enable == Vsync::Enable);
     ALOGE_IF(error != 0, "setVsyncEnabled: Failed to set vsync on HWC1 (%d)",
             error);
-
     mVsyncEnabled = enable;
     return Error::None;
 }
@@ -972,11 +980,11 @@ Error HWC2On1Adapter::Display::validate(uint32_t* outNumTypes,
         uint32_t* outNumRequests) {
     std::unique_lock<std::recursive_mutex> lock(mStateMutex);
 
-    if (!mChanges) {
+    if (!mChanges && !mHasPrepare) {
         if (!mDevice.prepareAllDisplays()) {
             return Error::BadDisplay;
         }
-    } else {
+    } else if(!mHasPrepare){
         ALOGE("Validate was called more than once!");
     }
 
@@ -1274,6 +1282,7 @@ Error HWC2On1Adapter::Display::set(hwc_display_contents_1& hwcContents) {
 
     if (!mChanges || (mChanges->getNumTypes() > 0)) {
         ALOGE("[%" PRIu64 "] set failed: not validated", mId);
+
         return Error::NotValidated;
     }
 
@@ -1916,6 +1925,7 @@ HWC2On1Adapter::Layer::Layer(Display& display)
     mSourceCrop({0.0f, 0.0f, -1.0f, -1.0f}),
     mTransform(Transform::None),
     mVisibleRegion(),
+    mDataSpace(HAL_DATASPACE_UNKNOWN),
     mZ(0),
     mReleaseFence(),
     mHwc1Id(0),
@@ -1945,7 +1955,8 @@ Error HWC2On1Adapter::Layer::setCursorPosition(int32_t x, int32_t y) {
 
     auto displayId = mDisplay.getHwc1Id();
     auto hwc1Device = mDisplay.getDevice().getHwc1Device();
-    hwc1Device->setCursorPositionAsync(hwc1Device, displayId, x, y);
+    if(hwc1Device != NULL && hwc1Device->setCursorPositionAsync)
+        hwc1Device->setCursorPositionAsync(hwc1Device, displayId, x, y);
     return Error::None;
 }
 
@@ -1979,7 +1990,9 @@ Error HWC2On1Adapter::Layer::setCompositionType(Composition type) {
     return Error::None;
 }
 
-Error HWC2On1Adapter::Layer::setDataspace(android_dataspace_t) {
+Error HWC2On1Adapter::Layer::setDataspace(android_dataspace_t dataspace) {
+    mDataSpace = dataspace;
+    mDisplay.markGeometryChanged();
     return Error::None;
 }
 
@@ -2103,6 +2116,7 @@ std::string HWC2On1Adapter::Layer::dump() const {
                 frectString(mSourceCrop) << '\n';
         output << fill << "  Transform: " << to_string(mTransform);
         output << "  Blend mode: " << to_string(mBlendMode);
+        output << " DataSpace: " << mDataSpace;
         if (mPlaneAlpha != 1.0f) {
             output << "  Alpha: " <<
                 alphaString(mPlaneAlpha) << '\n';
@@ -2148,6 +2162,11 @@ void HWC2On1Adapter::Layer::applyCommonState(hwc_layer_1_t& hwc1Layer) {
     } else {
         hwc1Layer.sourceCropf = mSourceCrop;
     }
+    auto pendingDataSpace = mDataSpace;
+    hwc1Layer.reserved[0] = pendingDataSpace & 0xFF;
+    hwc1Layer.reserved[1] = (pendingDataSpace >> 8) & 0xFF;
+    hwc1Layer.reserved[2] = (pendingDataSpace >> 16) & 0xFF;
+    hwc1Layer.reserved[3] = (pendingDataSpace >> 24) & 0xFF;
 
     hwc1Layer.transform = static_cast<uint32_t>(mTransform);
 
@@ -2397,6 +2416,8 @@ bool HWC2On1Adapter::prepareAllDisplays() {
         auto displayId = mHwc1DisplayMap[hwc1Id];
         auto& display = mDisplays[displayId];
         display->generateChanges();
+        display->markHasPrepare();
+        display->resetHasSet();
     }
 
     return true;
@@ -2521,6 +2542,8 @@ Error HWC2On1Adapter::setAllDisplays() {
                 retireFenceFd, hwc1Id);
         display->addRetireFence(mHwc1Contents[hwc1Id]->retireFenceFd);
         display->addReleaseFences(*mHwc1Contents[hwc1Id]);
+        display->resetHasPrepare();
+        display->markHasSet();
     }
 
     return Error::None;
@@ -2580,6 +2603,27 @@ void HWC2On1Adapter::hwc1Vsync(int hwc1DisplayId, int64_t timestamp) {
     vsync(callbackInfo.data, displayId, timestamp);
 }
 
+Error HWC2On1Adapter::Display::destroyLayers() {
+    std::unique_lock<std::recursive_mutex> lock(mStateMutex);
+
+    for (auto current = mLayers.begin(); current != mLayers.end(); ++current) {
+        for(auto current2 = mDevice.mLayers.begin(); current2 != mDevice.mLayers.end(); )
+        {
+          if(**current == *(current2->second))
+          {
+            current2=mDevice.mLayers.erase(current2);
+          }
+          else
+            ++current2;
+        }
+    }
+
+    mLayers.clear();
+    markGeometryChanged();
+
+    return Error::None;
+}
+
 void HWC2On1Adapter::hwc1Hotplug(int hwc1DisplayId, int connected) {
     ALOGV("Received hwc1Hotplug(%d, %d)", hwc1DisplayId, connected);
 
@@ -2612,9 +2656,44 @@ void HWC2On1Adapter::hwc1Hotplug(int hwc1DisplayId, int connected) {
             return;
         }
 
-        // Disconnect an existing display
         displayId = mHwc1DisplayMap[hwc1DisplayId];
+        auto& display = mDisplays[displayId];
+        //Remove extern display context if plug out HDMI.
+        //Fix crash when plug out HDMI.
+        /*
+          F DEBUG   : signal 11 (SIGSEGV), code 1 (SEGV_MAPERR), fault addr 0x10
+          ...
+          F DEBUG   :     #00 pc 0000000000068790  /system/lib64/libc.so (pthread_mutex_lock)
+          F DEBUG   :     #01 pc 00000000000b8a7c  /system/lib64/vndk-sp/libc++.so (std::__1::recursive_mutex::lock()+8)
+          F DEBUG   :     #02 pc 00000000000116f4  /vendor/lib64/libhwc2on1adapter.so (android::HWC2On1Adapter::setAllDisplays()+740)
+          F DEBUG   :     #03 pc 00000000000112b8  /vendor/lib64/libhwc2on1adapter.so (android::HWC2On1Adapter::Display::present(int*)+72)
+        */
+        if (mHwc1Contents[HWC_DISPLAY_EXTERNAL] != nullptr)
+        {
+            if(mHwc1Contents[HWC_DISPLAY_EXTERNAL]->retireFenceFd > 0){
+                close(mHwc1Contents[HWC_DISPLAY_EXTERNAL]->retireFenceFd);
+                mHwc1Contents[HWC_DISPLAY_EXTERNAL]->retireFenceFd = -1;
+            }
+            if(mHwc1Contents[HWC_DISPLAY_EXTERNAL]->outbufAcquireFenceFd > 0){
+                close(mHwc1Contents[HWC_DISPLAY_EXTERNAL]->outbufAcquireFenceFd);
+                mHwc1Contents[HWC_DISPLAY_EXTERNAL]->outbufAcquireFenceFd = -1;
+            }
+            for(size_t layerId=0 ; layerId < mHwc1Contents[HWC_DISPLAY_EXTERNAL]->numHwLayers ; layerId++)  {
+                hwc_layer_1_t& layer = mHwc1Contents[HWC_DISPLAY_EXTERNAL]->hwLayers[layerId];
+                if(layer.releaseFenceFd > 0){
+                    close(layer.releaseFenceFd);
+                    layer.releaseFenceFd = -1;
+                }
+                if(layer.acquireFenceFd > 0){
+                    close(layer.acquireFenceFd);
+                    layer.acquireFenceFd = -1;
+                }
+            }
+            mHwc1Contents.erase(mHwc1Contents.begin()+HWC_DISPLAY_EXTERNAL);
+        }
+        // Disconnect an existing display
         mHwc1DisplayMap.erase(HWC_DISPLAY_EXTERNAL);
+        display->destroyLayers();
         mDisplays.erase(displayId);
     }
 

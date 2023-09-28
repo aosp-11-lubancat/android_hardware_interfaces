@@ -48,7 +48,7 @@ class Gralloc0HalImpl : public V2_0::passthrough::detail::Gralloc0HalImpl<Hal> {
          int32_t ret = mModule->validateBufferSize(
                  mModule, bufferHandle, descriptorInfo.width, descriptorInfo.height,
                  static_cast<int32_t>(descriptorInfo.format),
-                 static_cast<uint64_t>(descriptorInfo.usage), stride);
+                 static_cast<uint64_t>(descriptorInfo.usage), descriptorInfo.layerCount, stride);
          if (ret == -EINVAL) {
              return Error::BAD_BUFFER;
          } else if (ret < 0) {

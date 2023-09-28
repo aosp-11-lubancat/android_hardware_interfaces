@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef ANDROID_HARDWARE_CAMERA_DEVICE_V3_4_EXTCAMERADEVICE_H
-#define ANDROID_HARDWARE_CAMERA_DEVICE_V3_4_EXTCAMERADEVICE_H
+#ifndef ANDROID_HARDWARE_CAMERA_DEVICE_V3_4_EXTFAKECAMERADEVICE_H
+#define ANDROID_HARDWARE_CAMERA_DEVICE_V3_4_EXTFAKECAMERADEVICE_H
 
 #include "utils/Mutex.h"
 #include "CameraMetadata.h"
@@ -23,7 +23,7 @@
 #include <android/hardware/camera/device/3.2/ICameraDevice.h>
 #include <hidl/Status.h>
 #include <hidl/MQDescriptor.h>
-#include "ExternalCameraDeviceSession_3.4.h"
+#include "ExternalFakeCameraDeviceSession_3.4.h"
 
 #include <vector>
 
@@ -51,15 +51,15 @@ using ::android::sp;
 /*
  * The camera device HAL implementation is opened lazily (via the open call)
  */
-struct ExternalCameraDevice : public virtual RefBase {
+struct ExternalFakeCameraDevice : public virtual RefBase {
 
     // Called by external camera provider HAL.
     // Provider HAL must ensure the uniqueness of CameraDevice object per cameraId, or there could
     // be multiple CameraDevice trying to access the same physical camera.  Also, provider will have
     // to keep track of all CameraDevice objects in order to notify CameraDevice when the underlying
     // camera is detached.
-    ExternalCameraDevice(const std::string& cameraId, const ExternalCameraConfig& cfg);
-    virtual ~ExternalCameraDevice();
+    ExternalFakeCameraDevice(const std::string& cameraId, const ExternalCameraConfig& cfg);
+    virtual ~ExternalFakeCameraDevice();
 
     // Retrieve the HIDL interface, split into its own class to avoid inheritance issues when
     // dealing with minor version revs and simultaneous implementation and interface inheritance
@@ -89,8 +89,8 @@ struct ExternalCameraDevice : public virtual RefBase {
 
 protected:
     // Overridden by child implementations for returning different versions of
-    // ExternalCameraDeviceSession
-    virtual sp<ExternalCameraDeviceSession> createSession(
+    // ExternalFakeCameraDeviceSession
+    virtual sp<ExternalFakeCameraDeviceSession> createSession(
             const sp<ICameraDeviceCallback>&,
             const ExternalCameraConfig& cfg,
             const std::vector<SupportedV4L2Format>& sortedFormats,
@@ -154,7 +154,7 @@ protected:
     std::vector<SupportedV4L2Format> mSupportedFormats;
     CroppingType mCroppingType;
 
-    wp<ExternalCameraDeviceSession> mSession = nullptr;
+    wp<ExternalFakeCameraDeviceSession> mSession = nullptr;
 
     ::android::hardware::camera::common::V1_0::helper::CameraMetadata mCameraCharacteristics;
 
@@ -205,7 +205,7 @@ protected:
 private:
 
     struct TrampolineDeviceInterface_3_4 : public ICameraDevice {
-        TrampolineDeviceInterface_3_4(sp<ExternalCameraDevice> parent) :
+        TrampolineDeviceInterface_3_4(sp<ExternalFakeCameraDevice> parent) :
             mParent(parent) {}
 
         virtual Return<void> getResourceCost(V3_2::ICameraDevice::getResourceCost_cb _hidl_cb)
@@ -232,7 +232,7 @@ private:
         }
 
     private:
-        sp<ExternalCameraDevice> mParent;
+        sp<ExternalFakeCameraDevice> mParent;
     };
 
 };
